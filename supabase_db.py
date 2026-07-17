@@ -7,6 +7,9 @@ from datetime import datetime
 from typing import List, Dict, Optional
 from dataclasses import dataclass
 from supabase import create_client, Client
+from dotenv import load_dotenv
+
+load_dotenv()
 
 @dataclass
 class Email:
