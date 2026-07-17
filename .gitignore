@@ -1,0 +1,38 @@
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+
+# Google OAuth tokens
+token.pickle
+token.json
+credentials.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Streamlit
+.streamlit/secrets.toml
