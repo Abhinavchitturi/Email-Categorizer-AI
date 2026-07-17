@@ -85,6 +85,8 @@ def render_email_card(email, show_confidence=True):
     except:
         date_str = processed_at
     reasoning = email.get('reasoning', '')[:100]
+    msg_id = email.get('message_id', '')
+    gmail_url = f"https://mail.google.com/mail/u/0/#all/{msg_id}" if msg_id else "#"
     st.markdown(f"""
     <div class="email-card {cat_class}">
         <strong>{email.get('subject', '')}</strong><br>
@@ -92,6 +94,7 @@ def render_email_card(email, show_confidence=True):
         <small>{date_str}</small>
         {f'<br><small style="color:{conf_color}">Confidence: {confidence:.0%}</small>' if show_confidence else ''}
         <br><small>{reasoning}...</small>
+        <br><a href="{gmail_url}" target="_blank" style="display:inline-block;margin-top:6px;padding:4px 10px;background:#1a73e8;color:#fff;border-radius:4px;text-decoration:none;font-size:0.8rem;">Open in Gmail</a>
     </div>
     """, unsafe_allow_html=True)
 
