@@ -206,7 +206,7 @@ def main():
                 all_emails.extend(get_emails_by_category(cat, 1000))
             
             if all_emails:
-                conf_df = pd.DataFrame([{'Category': e.category, 'Confidence': e.confidence} for e in all_emails])
+                conf_df = pd.DataFrame([{'Category': e.get('category', ''), 'Confidence': e.get('confidence', 0)} for e in all_emails])
                 fig = px.box(conf_df, x='Category', y='Confidence', title="Confidence by Category")
                 fig.update_xaxes(tickangle=45)
                 st.plotly_chart(fig, width="stretch")
