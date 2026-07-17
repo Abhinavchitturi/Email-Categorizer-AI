@@ -11,12 +11,11 @@ from typing import Optional, List, Dict, Tuple
 from dataclasses import dataclass
 from datetime import datetime
 
-from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
-import requests
 from dotenv import load_dotenv
+from groq import Groq
 
 from supabase_db import SupabaseDB, Email
 
@@ -74,27 +73,41 @@ CATEGORY_DESCRIPTIONS = {
 
 from supabase_db import SupabaseDB, Email
 
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
+from googleapiclient.discovery import build
+
 class GmailClient:
     def __init__(self):
         self.service = None
         self._authenticate()
     
     def _authenticate(self):
-        creds = None
-        if os.path.exists(TOKEN_FILE):
+        # Use refresh token from env (works on Streamlit Cloud)
+        # Fall back to local token.pickle for local development
+        client_id = os.getenv("GOOGLE_CLIENT_ID")
+        client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+        refresh_token = os.getenv("GOOGLE_REFRESH_TOKEN")
+        
+        if client_id and client_secret and refresh_token:
+            creds = Credentials(
+                token=None,
+                refresh_token=refresh_token,
+                client_id=client_id,
+                client_secret=client_secret,
+                token_uri="https://oauth2.googleapis.com/token",
+                scopes=SCOPES
+            )
+        elif os.path.exists(TOKEN_FILE):
             with open(TOKEN_FILE, 'rb') as f:
                 creds = pickle.load(f)
-        
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
+            if creds.expired and creds.refresh_token:
                 creds.refresh(Request())
-            else:
-                if not os.path.exists(CREDENTIALS_FILE):
-                    raise FileNotFoundError(f"{CREDENTIALS_FILE} not found. Download from Google Cloud Console.")
-                flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
-                creds = flow.run_local_server(port=0)
-            with open(TOKEN_FILE, 'wb') as f:
-                pickle.dump(creds, f)
+        else:
+            raise RuntimeError(
+                "No Google credentials found. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, "
+                "GOOGLE_REFRESH_TOKEN in env (Streamlit Cloud) or run locally to create token.pickle"
+            )
         
         self.service = build('gmail', 'v1', credentials=creds)
         profile = self.service.users().getProfile(userId='me').execute()
@@ -160,28 +173,21 @@ Rules:
 - If unsure, use "Other" with low confidence"""
     
     def classify(self, sender: str, subject: str) -> Tuple[str, float, str]:
-        if not self.enabled:
+        if not self.enabled or not self.client:
             return self._rule_based(sender, subject)
         
         prompt = self.build_prompt(sender, subject)
         
         try:
-            headers = {
-                'Authorization': f'Bearer {self.api_key}',
-                'Content-Type': 'application/json'
-            }
-            data = {
-                'model': self.model,
-                'messages': [{'role': 'user', 'content': prompt}],
-                'temperature': 0.1,
-                'max_tokens': 200,
-                'response_format': {'type': 'json_object'}
-            }
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[{'role': 'user', 'content': prompt}],
+                temperature=0.1,
+                max_tokens=200,
+                response_format={'type': 'json_object'}
+            )
             
-            response = requests.post(GROQ_URL, headers=headers, json=data, timeout=30)
-            response.raise_for_status()
-            result = response.json()
-            content = result['choices'][0]['message']['content']
+            content = response.choices[0].message.content
             parsed = json.loads(content)
             
             category = parsed.get('category', 'Other')
@@ -289,7 +295,14 @@ class GmailAIAgent:
 def main():
     import sys
     
-    if not os.path.exists(CREDENTIALS_FILE):
+    # Skip credentials.json check if using refresh token (cloud deployment)
+    use_refresh_token = all([
+        os.getenv("GOOGLE_CLIENT_ID"),
+        os.getenv("GOOGLE_CLIENT_SECRET"),
+        os.getenv("GOOGLE_REFRESH_TOKEN")
+    ])
+    
+    if not use_refresh_token and not os.path.exists(CREDENTIALS_FILE):
         print(f"ERROR: {CREDENTIALS_FILE} not found!")
         print("Download from Google Cloud Console > APIs & Services > Credentials")
         return
