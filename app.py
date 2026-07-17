@@ -60,7 +60,9 @@ def get_stats():
 @st.cache_data(ttl=30)
 def get_emails_by_category(category, limit=50):
     agent = get_agent()
-    return agent.get_emails_by_category(category, limit)
+    emails = agent.get_emails_by_category(category, limit)
+    # Convert dataclass to dict for Streamlit caching serialization
+    return [e.__dict__ for e in emails]
 
 def format_date(date_str):
     try:
@@ -70,15 +72,26 @@ def format_date(date_str):
         return date_str
 
 def render_email_card(email, show_confidence=True):
-    cat_class = f"category-{email.category.replace(' ', '-').replace('/', '-')}"
-    conf_color = "green" if email.confidence > 0.8 else "orange" if email.confidence > 0.5 else "red"
+    # email is a dict
+    cat = email.get('category', '')
+    cat_class = f"category-{cat.replace(' ', '-').replace('/', '-')}"
+    confidence = email.get('confidence', 0)
+    conf_color = "green" if confidence > 0.8 else "orange" if confidence > 0.5 else "red"
+    processed_at = email.get('processed_at', '')
+    # format date
+    try:
+        dt = datetime.fromisoformat(processed_at.replace('Z', '+00:00'))
+        date_str = dt.strftime('%b %d, %H:%M')
+    except:
+        date_str = processed_at
+    reasoning = email.get('reasoning', '')[:100]
     st.markdown(f"""
     <div class="email-card {cat_class}">
-        <strong>{email.subject}</strong><br>
-        <small>From: {email.sender[:60]}...</small><br>
-        <small>{format_date(email.processed_at)}</small>
-        {f'<br><small style="color:{conf_color}">Confidence: {email.confidence:.0%}</small>' if show_confidence else ''}
-        <br><small>{email.reasoning[:100]}...</small>
+        <strong>{email.get('subject', '')}</strong><br>
+        <small>From: {email.get('sender', '')[:60]}...</small><br>
+        <small>{date_str}</small>
+        {f'<br><small style="color:{conf_color}">Confidence: {confidence:.0%}</small>' if show_confidence else ''}
+        <br><small>{reasoning}...</small>
     </div>
     """, unsafe_allow_html=True)
 
@@ -117,7 +130,7 @@ def main():
             all_emails = []
             for cat in CATEGORIES:
                 all_emails.extend(get_emails_by_category(cat, 20))
-            all_emails.sort(key=lambda e: e.processed_at, reverse=True)
+            all_emails.sort(key=lambda e: e.get('processed_at', ''), reverse=True)
             emails_to_show = all_emails[:100]
         else:
             emails_to_show = get_emails_by_category(selected_cat, 100)
