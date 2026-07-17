@@ -196,10 +196,7 @@ def main():
                 st.plotly_chart(fig, width="stretch")
 
 if __name__ == "__main__":
-    if not os.path.exists("credentials.json"):
-        st.error("❌ credentials.json not found! Download from Google Cloud Console.")
-        st.stop()
-    
+    # On Streamlit Cloud, credentials come from secrets/env vars, not file
     from dotenv import load_dotenv
     load_dotenv()
     
